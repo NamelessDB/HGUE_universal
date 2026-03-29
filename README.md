@@ -7,7 +7,7 @@ What types of ISOs does it currently support?
 PS2
 PS3
 
-# What container extensions can it open?
+What container extensions can it open?
 
 Ben 10 Protector of Earth(Game.Wad) - PS2
 Silent Hill 3/2(? for test) MFA
@@ -26,7 +26,7 @@ Siren 2(ROM)
 Rule of Rose(RTPK) - PS2
 
 
-#What container extensions can Open on PS3?
+What container extensions can Open on PS3?
 Dragon Ball Budokai HD Collection (.bin compressed with GZIP DATA_CMN.afs works for now) - PS3
 
-#What's next? The tool is currently a content reader. I plan to update it and add more container plugins. In the distant future, I plan to add a file importer (although this is the most difficult part since it's the first time I've implemented a system like this, so I should study it more). I also plan to include a texture viewer, and in the distant future, support for 3D files, exporting to FBX, OBJ, and many more formats!
+What's next? The tool is currently a content reader. I plan to update it and add more container plugins. In the distant future, I plan to add a file importer (although this is the most difficult part since it's the first time I've implemented a system like this, so I should study it more). I also plan to include a texture viewer, and in the distant future, support for 3D files, exporting to FBX, OBJ, and many more formats!
