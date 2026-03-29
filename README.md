@@ -46,6 +46,13 @@ Dragon Ball Budokai HD Collection (.bin compressed with GZIP DATA_CMN.afs works 
 
 What's next? The tool is currently a content reader. I plan to update it and add more container plugins. In the distant future, I plan to add a file importer (although this is the most difficult part since it's the first time I've implemented a system like this, so I should study it more). I also plan to include a texture viewer, and in the distant future, support for 3D files, exporting to FBX, OBJ, and many more formats!
 
+
+Files with icons in a directory mean they can be opened and their contents viewed. You can also view files in hex format by right-clicking on a file in the directory and selecting the "View in hex" option. It also has a caching system, which helps open previously opened files and directories more quickly
+
+You can extract files from the directory, or those that have support
+
+I plan to add a Noesis-style plugin system so as not to significantly increase the size of the main.py class!
+
 Something important to note: the formats I'm implementing are thanks to my reverse engineering of the files, and sometimes with help from Diana Devs. Thanks for reading!
 
 
