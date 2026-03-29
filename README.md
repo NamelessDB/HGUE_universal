@@ -54,4 +54,5 @@ Something important to note: the formats I'm implementing are thanks to my rever
 
 # Requirements to run the program:
 Python Version 3.1.0
+
 Library to install: customtkinter
