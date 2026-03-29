@@ -10,20 +10,35 @@ PS3
 What container extensions can it open?
 
 Ben 10 Protector of Earth(Game.Wad) - PS2
+
 Silent Hill 3/2(? for test) MFA
+
 Format .AFS - PS3 - PS2
+
 Suzumiya Haruhi no Tomadoi(melan.img) - PS2
+
 Di Gi Charat Fantasy Excellent(PAK) - PS2
+
 Battle Stadium D.O.N(FPK) - PS2
+
 Critical Bullet 7th Target(PAC) - PS2
+
 Growlanser VI Precarious World(GL6_SND.dat for now) - PS2
+
 Dragon Ball Sagas(DBU Files) - PS2
+
 Kuon(.BND) - PS2
+
 The X Secret Files(.EFS) - PS2
+
 ADX Support Beta(Required DKZ Studio Installed) - PS2
+
 Fate-Stay Night Realta Nua(BIN) - PS2
+
 Siren 2(ROM)
+
 Rule of Rose(RTPK) - PS2
+
 
 
 What container extensions can Open on PS3?
