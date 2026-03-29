@@ -47,3 +47,11 @@ Dragon Ball Budokai HD Collection (.bin compressed with GZIP DATA_CMN.afs works 
 What's next? The tool is currently a content reader. I plan to update it and add more container plugins. In the distant future, I plan to add a file importer (although this is the most difficult part since it's the first time I've implemented a system like this, so I should study it more). I also plan to include a texture viewer, and in the distant future, support for 3D files, exporting to FBX, OBJ, and many more formats!
 
 Something important to note: the formats I'm implementing are thanks to my reverse engineering of the files, and sometimes with help from Diana Devs. Thanks for reading!
+
+
+
+
+
+#Requirements to run the program:
+Python Version 3.1.0
+Library to install: customtkinter
