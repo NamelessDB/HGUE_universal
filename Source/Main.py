@@ -3,7 +3,8 @@ Huziad Game Explorer - Tool for exploring PS2 game files
 Supports formats: ISO9660, AFS, RTPK/RPK, MFA (Silent Hill), FPK (Battle Stadium D.O.N.), 
 SPK (Siren 2), ADX (Audio), DBU (DBZ Sagas), MF Pack (Fate/Stay Night), BND (Various Games), 
 EFS (Container format), GZIP (Budokai HD Collection), GL6 (Growlanser VI), SARA2 (Critical Bullet 7th Target), 
-PAK (Di Gi Charat Fantasy Excellent), MELAN (Suzumiya Haruhi no Tomadoi), BEN10 (Ben 10: Protector of Earth)
+PAK (Di Gi Charat Fantasy Excellent), MELAN (Suzumiya Haruhi no Tomadoi), BEN10 (Ben 10: Protector of Earth),
+XXXHOLiC (Watanuki no Izayoi Souwa)
 """
 import customtkinter as ctk
 from tkinter import filedialog, messagebox
@@ -32,11 +33,16 @@ from gzip_reader import GZIPReader
 from melan_reader import MelanReader
 from cache_manager import CacheManager
 from ben10_pre_wad import Ben10WADReader, parse_dir_to_entries, detect_ben10_wad
+from xxxholic_watanuki_reader import XXXHolicReader, find_matching_hd_bin_pairs
+
+# Plugin system imports
+from plugins.plugin_manager import PluginManager
+from plugins.plugin_base import ContainerPlugin, ContainerReader
 
 
-
-#PAK EXTRACTOR (Di Gi Charat Fantasy Excellent)
-
+# =========================
+# PAK EXTRACTOR (Di Gi Charat Fantasy Excellent)
+# =========================
 class PAKReader:
     """Class for reading PAK files (Di Gi Charat Fantasy Excellent)"""
     
@@ -222,18 +228,18 @@ class SARA2Extractor:
                 name = parts[0]
                 
                 try:
-                    
+                    # offset puede venir decimal o hex
                     if any(c in parts[1].lower() for c in "abcdef"):
                         offset = int(parts[1], 16)
                     else:
                         offset = int(parts[1])
                     
-                    
+                    # SIZE siempre HEX
                     size = int(parts[2], 16)
                 except:
                     continue
                 
-               
+                # limpiar nombre inválido
                 safe_name = "".join(c for c in name if c not in '\\/:*?"<>|\n\r')
                 
                 self.entries.append({
@@ -289,7 +295,9 @@ class SARA2Extractor:
         return None
 
 
-
+# =========================
+# HEX VIEWER
+# =========================
 class HexViewer(ctk.CTkToplevel):
     """Hexadecimal viewer for files with search functionality"""
     
@@ -308,14 +316,14 @@ class HexViewer(ctk.CTkToplevel):
         self._create_widgets()
         self._display_hex()
         
-
+        # Bind escape key to close
         self.bind('<Escape>', lambda e: self.destroy())
         self.bind('<Control-f>', lambda e: self.search_entry.focus())
     
     def _create_widgets(self):
         """Create hex viewer widgets"""
         
-
+        # Top frame with controls
         top_frame = ctk.CTkFrame(self)
         top_frame.pack(fill="x", padx=10, pady=10)
         
@@ -598,6 +606,13 @@ class HuziadGameExplorer(ctk.CTk):
         self.current_iso_path = None
         self.current_selected_item = None
         
+        # Plugin system variables
+        self.plugin_manager = PluginManager()
+        self.plugin_handlers = {}  # Store active plugin readers
+        self.current_plugin_mode = None
+        self.current_plugin_entry = None
+        self.current_plugin_class = None
+        
         # Containers
         self.current_afs = None
         self.current_rtpk = None
@@ -614,6 +629,7 @@ class HuziadGameExplorer(ctk.CTk):
         self.current_pak = None
         self.current_melan = None
         self.current_ben10 = None  # Ben 10 WAD reader
+        self.current_xxxholic = None  # XXXHOLiC reader
         
         self.afs_mode = False
         self.rtpk_mode = False
@@ -630,6 +646,7 @@ class HuziadGameExplorer(ctk.CTk):
         self.pak_mode = False
         self.melan_mode = False
         self.ben10_mode = False  # Ben 10 mode flag
+        self.xxxholic_mode = False  # XXXHOLiC mode flag
         
         self.afs_parent_entry = None
         self.rtpk_parent_entry = None
@@ -645,11 +662,13 @@ class HuziadGameExplorer(ctk.CTk):
         self.sara2_parent_entry = None
         self.pak_parent_entry = None
         self.melan_parent_entry = None
-        self.ben10_parent_entry = None  
+        self.ben10_parent_entry = None  # Ben 10 parent entry
+        self.xxxholic_parent_entry = None  # XXXHOLiC parent entry
         
         self.sara2_pac_data = None
         self.melan_img_data = None
-        self.ben10_wad_data = None  
+        self.ben10_wad_data = None  # Ben 10 WAD data
+        self.xxxholic_bin_data = None  # XXXHOLiC BIN data
         
         # SPK specific
         self.spk_roms_dir = None
@@ -687,9 +706,121 @@ class HuziadGameExplorer(ctk.CTk):
         # Cleanup on close
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
         
+        # Discover plugins
+        self.plugin_manager.discover_plugins()
+        
         # Show cache info at startup
         cache_info = self.cache_manager.get_cache_info()
         self.update_status(f"Ready - Cache: {cache_info['entries']} files ({cache_info['size_mb']:.1f} MB)")
+    
+    def get_plugin_handler(self, entry):
+        """Check if any plugin can handle this file"""
+        # Skip if already in a container
+        if entry.get('is_container_file', False):
+            return None
+        
+        # Read first few bytes for magic checking
+        data_preview = None
+        if not entry.get('is_directory', False) and entry.get('size', 0) > 0:
+            try:
+                preview_size = min(entry['size'], 1024)
+                data_preview = self.iso_reader.read_file_data(entry['location'], preview_size)
+            except:
+                pass
+        
+        plugin = self.plugin_manager.get_plugin_for_file(
+            entry['name'], data_preview, self.iso_reader, self.current_entries
+        )
+        
+        if plugin:
+            print(f"[Plugin] Found handler for {entry['name']}: {plugin.plugin_name}")
+            return plugin
+        return None
+    
+    def open_plugin_container(self, entry, plugin_class):
+        """Open a container using a plugin"""
+        try:
+            self.update_status(f"Loading {plugin_class.plugin_name}: {entry['name']}...")
+            
+            # Create reader using plugin
+            reader = plugin_class.create_reader(entry, self.iso_reader)
+            
+            if reader and len(reader.get_entries()) > 0:
+                # Store in plugin handlers dictionary
+                plugin_id = f"plugin_{plugin_class.plugin_name}_{id(reader)}"
+                self.plugin_handlers[plugin_id] = reader
+                self.current_plugin_mode = plugin_id
+                self.current_plugin_entry = entry
+                self.current_plugin_class = plugin_class
+                self.exit_container_btn.configure(state="normal")
+                
+                # Clear and show content
+                for item in self.tree.get_children():
+                    self.tree.delete(item)
+                self.item_data.clear()
+                
+                plugin_entries = reader.get_entries()
+                self.current_path = f"{entry['full_path']} [{plugin_class.container_type_name}]"
+                self.path_label.configure(text=f"{plugin_class.icon} {self.current_path}")
+                
+                # Organize by directory structure if needed
+                entries_by_dir = {}
+                for idx, plugin_entry in enumerate(plugin_entries):
+                    if plugin_entry.get('is_directory', False):
+                        # Add directory entry
+                        item_id = self.tree.insert(
+                            "", "end",
+                            text=f"📁 {plugin_entry['name']}",
+                            values=("<DIR>", "Directory", "")
+                        )
+                        self.item_data[item_id] = {
+                            'name': plugin_entry['name'],
+                            'full_path': plugin_entry['full_path'],
+                            'is_directory': True,
+                            'is_container_file': True,
+                            'container_type': 'PLUGIN',
+                            'container_reader': reader,
+                            'container_index': idx,
+                            'plugin_class': plugin_class,
+                            'plugin_id': plugin_id
+                        }
+                    else:
+                        # Add file entry
+                        size_str = self._format_size_display(plugin_entry['size'])
+                        icon = plugin_entry.get('icon', plugin_class.icon)
+                        item_id = self.tree.insert(
+                            "", "end",
+                            text=f"{icon} {plugin_entry['name']}",
+                            values=(size_str, plugin_entry.get('type', plugin_class.container_type_name), "")
+                        )
+                        
+                        self.item_data[item_id] = {
+                            'name': plugin_entry['name'],
+                            'full_path': plugin_entry['full_path'],
+                            'is_directory': False,
+                            'size': plugin_entry['size'],
+                            'is_container_file': True,
+                            'container_type': 'PLUGIN',
+                            'container_reader': reader,
+                            'container_index': idx,
+                            'date': '',
+                            'plugin_class': plugin_class,
+                            'plugin_id': plugin_id,
+                            'offset': plugin_entry.get('offset', 0),
+                            'sector': plugin_entry.get('sector', 0),
+                            'ext': plugin_entry.get('ext', '')
+                        }
+                
+                stats = reader.get_stats() if hasattr(reader, 'get_stats') else {'files': len(plugin_entries)}
+                self.update_status(f"✅ {plugin_class.plugin_name} loaded: {entry['name']} - {stats.get('files', len(plugin_entries))} files")
+            else:
+                messagebox.showwarning("Warning", f"The file does not appear to be a valid {plugin_class.plugin_name} archive")
+                
+        except Exception as e:
+            self.update_status(f"❌ Error loading plugin container: {str(e)}", True)
+            messagebox.showerror("Error", f"Could not load container:\n{str(e)}")
+            import traceback
+            traceback.print_exc()
     
     def on_closing(self):
         self.adx_player.cleanup()
@@ -966,6 +1097,8 @@ class HuziadGameExplorer(ctk.CTk):
                     pass
                 elif container_type == 'BEN10':
                     pass
+                elif container_type == 'XXXHOLIC':
+                    pass
                 
                 self.update_status(f"✅ {container_type} loaded from cache: {entry['name']}")
                 return container_reader, True
@@ -1111,6 +1244,68 @@ class HuziadGameExplorer(ctk.CTk):
         except Exception as e:
             self.update_status(f"❌ Error loading Ben 10 WAD: {str(e)}", True)
             messagebox.showerror("Error", f"Could not load Ben 10 WAD:\n{str(e)}")
+    
+    def open_xxxholic(self, hd_entry, bin_entry):
+        """Open XXXHOLiC HD/BIN archive pair"""
+        try:
+            self.update_status(f"Loading XXXHOLiC archive: {hd_entry['name']} + {bin_entry['name']}...")
+            
+            # Read HD and BIN data
+            hd_data = self.iso_reader.read_file_data(hd_entry['location'], hd_entry['size'])
+            bin_data = self.iso_reader.read_file_data(bin_entry['location'], bin_entry['size'])
+            
+            # Create XXXHOLiC reader
+            container_reader = XXXHolicReader(hd_data, bin_data, hd_entry['name'], 
+                                              self.iso_reader, hd_entry['full_path'])
+            
+            if container_reader and len(container_reader.get_entries()) > 0:
+                self.current_xxxholic = container_reader
+                self.xxxholic_mode = True
+                self.xxxholic_parent_entry = hd_entry
+                self.xxxholic_bin_data = bin_data
+                self.exit_container_btn.configure(state="normal")
+                
+                # Clear and show content
+                for item in self.tree.get_children():
+                    self.tree.delete(item)
+                self.item_data.clear()
+                
+                xxxholic_entries = self.current_xxxholic.get_entries()
+                self.current_path = f"{hd_entry['full_path']} [XXXHOLiC Archive]"
+                stats = self.current_xxxholic.get_stats()
+                self.path_label.configure(text=f"⛩️ {self.current_path}")
+                
+                for idx, xxx_entry in enumerate(xxxholic_entries):
+                    size_str = self._format_size_display(xxx_entry['size'])
+                    icon = xxx_entry.get('icon', "📄 ")
+                    
+                    item_id = self.tree.insert(
+                        "", "end",
+                        text=f"{icon}{xxx_entry['name']}",
+                        values=(size_str, xxx_entry['type'], "")
+                    )
+                    
+                    self.item_data[item_id] = {
+                        'name': xxx_entry['name'],
+                        'full_path': f"{hd_entry['full_path']}/{xxx_entry['name']}",
+                        'is_directory': False,
+                        'size': xxx_entry['size'],
+                        'is_container_file': True,
+                        'container_type': 'XXXHOLIC',
+                        'container_reader': self.current_xxxholic,
+                        'container_index': idx,
+                        'date': '',
+                        'offset': xxx_entry['offset'],
+                        'ext': xxx_entry['ext']
+                    }
+                
+                self.update_status(f"✅ XXXHOLiC archive loaded: {hd_entry['name']} + {bin_entry['name']} - {len(xxxholic_entries)} files")
+            else:
+                messagebox.showwarning("Warning", "The files do not appear to be a valid XXXHOLiC archive")
+                
+        except Exception as e:
+            self.update_status(f"❌ Error loading XXXHOLiC archive: {str(e)}", True)
+            messagebox.showerror("Error", f"Could not load XXXHOLiC archive:\n{str(e)}")
     
     def _find_file_in_iso(self, filename):
         """Search for a file in the ISO recursively"""
@@ -2224,11 +2419,32 @@ class HuziadGameExplorer(ctk.CTk):
         # Detect special formats
         name_lower = entry['name'].lower()
         name_upper = entry['name'].upper()
+
+        if name_lower == 'aphro.idx':
+            icon = "💕📇 "  # Corazón + tarjeta de índice
+            type_str = "Love Hina Archive Index (aphro.idx)"
+            
+            
+  
         
         # Ben 10 detection (game.dir)
         if name_lower == 'game.dir':
             icon = "🎮 "
             type_str = "Ben 10 WAD Index (game.dir)"
+        # XXXHOLiC detection
+        elif name_lower.endswith('.hd'):
+            icon = "⛩️ "
+            type_str = "XXXHOLiC Index (.HD)"
+        elif name_lower.endswith('.bin'):
+            # Detectar si es parte de XXXHOLiC (tiene .hd correspondiente)
+            if self.current_entries:
+                base_name = name_lower[:-4]
+                hd_name = base_name + '.hd'
+                for e in self.current_entries:
+                    if e['name'].lower() == hd_name:
+                        icon = "⛩️ "
+                        type_str = "XXXHOLiC Data (.BIN)"
+                        break
         # MELAN IDX detection
         elif name_upper.endswith('.IDX') and 'MELAN' in name_upper:
             icon = "📊 "
@@ -2317,13 +2533,14 @@ class HuziadGameExplorer(ctk.CTk):
             self.item_data.clear()
             
             self.current_path = ""
-            self.afs_mode = self.rtpk_mode = self.mfa_mode = self.fpk_mode = self.spk_mode = self.dbu_mode = self.mfpack_mode = self.bnd_mode = self.efs_mode = self.gzip_mode = self.gl6_mode = self.sara2_mode = self.pak_mode = self.melan_mode = self.ben10_mode = False
-            self.current_afs = self.current_rtpk = self.current_mfa = self.current_fpk = self.current_spk = self.current_dbu = self.current_mfpack = self.current_bnd = self.current_efs = self.current_gzip = self.current_gl6 = self.current_sara2 = self.current_pak = self.current_melan = self.current_ben10 = None
-            self.afs_parent_entry = self.rtpk_parent_entry = self.mfa_parent_entry = self.fpk_parent_entry = self.spk_parent_entry = self.dbu_parent_entry = self.mfpack_parent_entry = self.bnd_parent_entry = self.efs_parent_entry = self.gzip_parent_entry = self.gl6_parent_entry = self.sara2_parent_entry = self.pak_parent_entry = self.melan_parent_entry = self.ben10_parent_entry = None
+            self.afs_mode = self.rtpk_mode = self.mfa_mode = self.fpk_mode = self.spk_mode = self.dbu_mode = self.mfpack_mode = self.bnd_mode = self.efs_mode = self.gzip_mode = self.gl6_mode = self.sara2_mode = self.pak_mode = self.melan_mode = self.ben10_mode = self.xxxholic_mode = False
+            self.current_afs = self.current_rtpk = self.current_mfa = self.current_fpk = self.current_spk = self.current_dbu = self.current_mfpack = self.current_bnd = self.current_efs = self.current_gzip = self.current_gl6 = self.current_sara2 = self.current_pak = self.current_melan = self.current_ben10 = self.current_xxxholic = None
+            self.afs_parent_entry = self.rtpk_parent_entry = self.mfa_parent_entry = self.fpk_parent_entry = self.spk_parent_entry = self.dbu_parent_entry = self.mfpack_parent_entry = self.bnd_parent_entry = self.efs_parent_entry = self.gzip_parent_entry = self.gl6_parent_entry = self.sara2_parent_entry = self.pak_parent_entry = self.melan_parent_entry = self.ben10_parent_entry = self.xxxholic_parent_entry = None
             self.spk_roms_dir = None
             self.sara2_pac_data = None
             self.melan_img_data = None
             self.ben10_wad_data = None
+            self.xxxholic_bin_data = None
             self.exit_container_btn.configure(state="disabled")
             
             self._load_directory(self.iso_reader.root_directory)
@@ -2354,6 +2571,11 @@ class HuziadGameExplorer(ctk.CTk):
             self.current_entries = entries
             entries.sort(key=lambda x: (not x['is_directory'], x['name'].lower()))
             
+            # Detectar pares XXXHOLiC
+            xxx_pairs = find_matching_hd_bin_pairs(entries)
+            if len(xxx_pairs) >= 14:
+                self.update_status(f"Detected XXXHOLiC game - {len(xxx_pairs)} HD/BIN pairs found")
+            
             for entry in entries:
                 if entry['name'] in ['.', '..']:
                     continue
@@ -2373,6 +2595,27 @@ class HuziadGameExplorer(ctk.CTk):
     
     def exit_container(self):
         """Exit current container"""
+        # Check plugin mode FIRST
+        if hasattr(self, 'current_plugin_mode') and self.current_plugin_mode:
+            self.current_plugin_mode = None
+            self.current_plugin_entry = None
+            self.current_plugin_class = None
+            
+            parent_dir = os.path.dirname(self.current_plugin_entry['full_path']) if self.current_plugin_entry else ''
+            if parent_dir == '' or not parent_dir:
+                self._load_directory(self.iso_reader.root_directory)
+                self.current_path = ""
+                self.path_label.configure(text=f"📁 /")
+            else:
+                self._load_directory(self.iso_reader.root_directory)
+                self.current_path = parent_dir
+                self.path_label.configure(text=f"📁 {parent_dir}")
+            
+            self.exit_container_btn.configure(state="disabled")
+            self.update_status("✅ Exited plugin container")
+            return
+        
+        # Rest of your existing exit_container code...
         if self.afs_mode and self.iso_reader and self.afs_parent_entry:
             self.afs_mode = False
             self.current_afs = None
@@ -2452,6 +2695,12 @@ class HuziadGameExplorer(ctk.CTk):
             parent_entry = self.ben10_parent_entry
             self.ben10_parent_entry = None
             self.ben10_wad_data = None
+        elif self.xxxholic_mode and self.iso_reader and self.xxxholic_parent_entry:
+            self.xxxholic_mode = False
+            self.current_xxxholic = None
+            parent_entry = self.xxxholic_parent_entry
+            self.xxxholic_parent_entry = None
+            self.xxxholic_bin_data = None
         else:
             return
             
@@ -2534,6 +2783,24 @@ class HuziadGameExplorer(ctk.CTk):
                 details += f"📀 Sector: {entry.get('sector', 0)}\n"
                 details += f"🎬 Format: {entry.get('type', 'Unknown')}\n"
                 details += f"💡 Files: .bik (Bink Video), .pss (PSS Video), .psm (PSM Texture), .txt (Text)\n"
+            elif entry.get('container_type') == 'XXXHOLIC':
+                details += f"""
+⛩️ Type: XXXHOLiC Archive File
+📦 Format: {entry.get('type', 'Unknown')}
+📍 Offset: 0x{entry.get('offset', 0):08X}
+🎨 Extension: {entry.get('ext', 'unknown')}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💡 This file is from XXXHOLiC: Watanuki no Izayoi Souwa
+   - PAK files: Can contain more data
+   - FAC files: Game data files  
+   - TM2 files: Textures
+   - LST files: List files
+
+💡 Double-click .HD files to open the entire archive
+💡 You can extract this file using the Extract button
+"""
             elif entry.get('is_budokai_gzip', False):
                 details += f"🗜️ Type: GZIP compressed data (Budokai HD Collection)\n"
                 details += f"💡 Double-click to decompress and view contents\n"
@@ -2554,6 +2821,22 @@ This file is the index for game.wad. It contains:
   - .txt (Text File) - Game text data
 
 💡 Double-click to view all files inside game.wad
+"""
+        elif entry['name'].lower().endswith('.hd'):
+            details += """
+⛩️ XXXHOLiC: Watanuki no Izayoi Souwa - Index File
+💡 Double-click to open the HD/BIN archive
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+This file is the index for the corresponding .BIN file.
+It contains:
+  - PAK files (Game data archives)
+  - FAC files (Game data)
+  - TM2 files (Textures)
+  - LST files (List files)
+
+💡 Double-click to view all files inside the archive
 """
         elif entry['name'].lower().endswith('.adx'):
             details += """
@@ -2640,14 +2923,63 @@ This file is the index for game.wad. It contains:
         if not entry:
             return
         
+        # Check for plugin handlers FIRST (before any built-in formats)
+        if not entry.get('is_directory', False) and not entry.get('is_container_file', False):
+            plugin = self.get_plugin_handler(entry)
+            if plugin:
+                self.open_plugin_container(entry, plugin)
+                return
+        
+        # Rest of your existing double-click code...
         name_lower = entry['name'].lower()
         name_upper = entry['name'].upper()
         
         # Ben 10 detection - check for game.dir
         if name_lower == 'game.dir':
             self.open_ben10(entry)
+        # XXXHOLiC detection - check for .hd files
+        elif name_lower.endswith('.hd'):
+            # Buscar el archivo .bin correspondiente
+            base_name = name_lower[:-3]
+            bin_name = base_name + '.bin'
+            bin_entry = None
+            
+            for e in self.current_entries:
+                if e['name'].lower() == bin_name:
+                    bin_entry = e
+                    break
+            
+            if bin_entry:
+                self.open_xxxholic(entry, bin_entry)
+            else:
+                messagebox.showinfo("Info", f"Could not find matching .BIN file for {entry['name']}")
+        elif name_lower.endswith('.bin'):
+            # Verificar si tiene .hd correspondiente
+            base_name = name_lower[:-4]
+            hd_name = base_name + '.hd'
+            hd_entry = None
+            
+            for e in self.current_entries:
+                if e['name'].lower() == hd_name:
+                    hd_entry = e
+                    break
+            
+            if hd_entry:
+                self.open_xxxholic(hd_entry, entry)
+            else:
+                # Si no tiene HD, tratar como binario normal (GZIP u otro)
+                try:
+                    data = self.iso_reader.read_file_data(entry['location'], min(entry['size'], 10))
+                    if data[:2] == b'\x1f\x8b':
+                        self.open_gzip(entry)
+                    else:
+                        self.open_gzip(entry)
+                except:
+                    self.open_gzip(entry)
         elif entry.get('container_type') == 'BEN10':
             messagebox.showinfo("Info", f"Ben 10 File: {entry['name']}\n\nYou can extract it with the Extract button.")
+        elif entry.get('container_type') == 'XXXHOLIC':
+            messagebox.showinfo("Info", f"XXXHOLiC File: {entry['name']}\n\nYou can extract it with the Extract button.")
         elif entry.get('container_type') == 'GL6':
             messagebox.showinfo("Info", f"VAG Audio File: {entry['name']}\n\nYou can extract it with the Extract button.")
         elif entry.get('is_budokai_gzip', False):
@@ -2703,7 +3035,7 @@ This file is the index for game.wad. It contains:
     
     def go_back(self):
         """Go back to previous directory"""
-        if self.afs_mode or self.rtpk_mode or self.mfa_mode or self.fpk_mode or self.spk_mode or self.dbu_mode or self.mfpack_mode or self.bnd_mode or self.efs_mode or self.gzip_mode or self.gl6_mode or self.sara2_mode or self.pak_mode or self.melan_mode or self.ben10_mode:
+        if self.afs_mode or self.rtpk_mode or self.mfa_mode or self.fpk_mode or self.spk_mode or self.dbu_mode or self.mfpack_mode or self.bnd_mode or self.efs_mode or self.gzip_mode or self.gl6_mode or self.sara2_mode or self.pak_mode or self.melan_mode or self.ben10_mode or self.xxxholic_mode:
             self.exit_container()
             return
             
@@ -2749,7 +3081,21 @@ This file is the index for game.wad. It contains:
         try:
             self.update_status(f"Extracting {entry['name']}...")
             
-            if entry.get('container_type') == 'BEN10':
+            # Check for plugin extraction FIRST
+            if entry.get('container_type') == 'PLUGIN':
+                reader = entry.get('container_reader')
+                idx = entry.get('container_index')
+                if reader and idx is not None:
+                    success, msg = reader.extract_file(idx, dest_path)
+                    if success:
+                        self.update_status(f"✅ File extracted: {os.path.basename(dest_path)}")
+                        messagebox.showinfo("Success", f"File extracted successfully:\n{dest_path}")
+                    else:
+                        raise Exception(msg)
+                else:
+                    raise Exception("Error extracting from plugin container")
+            
+            elif entry.get('container_type') == 'BEN10':
                 reader = entry.get('container_reader')
                 idx = entry.get('container_index')
                 if reader and idx is not None:
@@ -2761,6 +3107,19 @@ This file is the index for game.wad. It contains:
                         raise Exception(msg)
                 else:
                     raise Exception("Error extracting from Ben 10 WAD")
+            
+            elif entry.get('container_type') == 'XXXHOLIC':
+                reader = entry.get('container_reader')
+                idx = entry.get('container_index')
+                if reader and idx is not None:
+                    success, msg = reader.extract_file(idx, dest_path)
+                    if success:
+                        self.update_status(f"✅ File extracted from XXXHOLiC archive: {os.path.basename(dest_path)}")
+                        messagebox.showinfo("Success", f"File extracted successfully:\n{dest_path}")
+                    else:
+                        raise Exception(msg)
+                else:
+                    raise Exception("Error extracting from XXXHOLiC archive")
             
             elif entry.get('container_type') == 'MELAN':
                 reader = entry.get('container_reader')
@@ -3024,7 +3383,9 @@ This file is the index for game.wad. It contains:
    • PAK - Di Gi Charat Fantasy Excellent
    • MELAN - Suzumiya Haruhi no Tomadoi (IDX + IMG)
    • BEN10 - Ben 10: Protector of Earth (game.dir + game.wad)
+   • XXXHOLiC - Watanuki no Izayoi Souwa (HD/BIN archives)
    • ADX - Audio (double-click to play)
+   • PLUGIN SYSTEM - Add custom format support via plugins folder
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -3034,11 +3395,13 @@ This file is the index for game.wad. It contains:
    • Location: {self.cache_manager.cache_dir}
 
 💡 Ben 10: Double-click game.dir to view game.wad contents
+💡 XXXHOLiC: Double-click .HD files to view .BIN contents
 💡 Budokai HD: When opening DATA_CMN.AFS (3990 files), all files are GZIP compressed
 💡 DATA.AFS (135 files): Contains FPK archives - double-click to open
 💡 Critical Bullet: Double-click SARA2.IDX to extract files from SARA2.PAC
 💡 Di Gi Charat: Double-click EFFECT.PAK or ETC.PAK to extract files
 💡 Suzumiya Haruhi: Double-click melan.idx to extract files from melan.img
+💡 PLUGINS: Add .py files to the 'plugins' folder to support additional formats
 💡 Right-click any file and select 'View in Hex' for hex viewer
 """
         
