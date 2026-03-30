@@ -2421,9 +2421,16 @@ class HuziadGameExplorer(ctk.CTk):
         name_upper = entry['name'].upper()
 
         if name_lower == 'aphro.idx':
-            icon = "💕📇 "  # Corazón + tarjeta de índice
+            icon = "💕📇 "  
             type_str = "Love Hina Archive Index (aphro.idx)"
-            
+
+        elif name_lower == 'oga2.apf':
+            icon = "🖤 "
+            type_str = "One Piece APF Container"
+              
+       
+           
+              
             
   
         
