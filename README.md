@@ -41,7 +41,13 @@ Rule of Rose(RTPK) - PS2
 
 One Piece Grand Aventure(APF) - PS2
 
+Dragon Ball Z Tenkaichi 1 US (VOL) - PS2
 
+D.Gray-man Sousha no Shikaku(DAT) - PS2
+
+Hannah Montana Spotlight World(HOG) - PS2
+
+Seigi no Mikata(.BIN) - PS2
 
 
 What container extensions can Open on PS3?
