@@ -2428,8 +2428,50 @@ class HuziadGameExplorer(ctk.CTk):
             icon = "🖤 "
             type_str = "One Piece APF Container"
               
-       
+        elif name_lower == 'dbzus0.vol':
+            icon = "🍇 "
+            type_str = "DBZ VOL CONTAINER"
+            
+        elif name_lower == 'data0.dat':
+            icon = "🍇 "
+            type_str = "DAT CONTAINER"
+            
+        elif name_lower == 'data1.dat':
+            icon = "🍇 "
+            type_str = "DAT CONTAINER"
+
+        elif name_lower == 'data2.dat':
+            icon = "🍇 "
+            type_str = "DAT CONTAINER"
+
+        elif name_lower == 'data3.dat':
+            icon = "🍇 "
+            type_str = "DAT CONTAINER"
+
+
+        elif name_lower == 'main.hog':
+            icon = "❤️‍🩹 "
+            type_str = "HANNAH MONTANA CONTAINER"
+
+        elif name_lower == 'menu.hog':
+            icon = "❤️‍🩹 "
+            type_str = "HANNAH MONTANA CONTAINER"
+
+
+        elif name_lower == 'main.hog':
+            icon = "❤️‍🩹 "
+            type_str = "HANNAH MONTANA CONTAINER"
+
+
+        elif name_lower == 'say.hog':
+            icon = "❤️‍🩹 "
+            type_str = "HANNAH MONTANA CONTAINER"
+
+        
+        
            
+
+
               
             
   
