@@ -17,15 +17,15 @@ Format .AFS - PS3 - PS2
 
 Suzumiya Haruhi no Tomadoi(melan.img) - PS2
 
-Di Gi Charat Fantasy Excellent(PAK) - PS2
+Di Gi Charat Fantasy Excellent(.PAK) - PS2
 
-Battle Stadium D.O.N(FPK) - PS2
+Battle Stadium D.O.N(.FPK) - PS2
 
-Critical Bullet 7th Target(PAC) - PS2
+Critical Bullet 7th Target(.PAC) - PS2
 
 Growlanser VI Precarious World(GL6_SND.dat for now) - PS2
 
-Dragon Ball Sagas(DBU Files) - PS2
+Dragon Ball Sagas(.DBU Files) - PS2
 
 Kuon(.BND) - PS2
 
@@ -33,19 +33,19 @@ The X Secret Files(.EFS) - PS2
 
 ADX Support Beta(Required DKZ Studio Installed) - PS2
 
-Fate-Stay Night Realta Nua(BIN) - PS2
+Fate-Stay Night Realta Nua(.BIN) - PS2
 
-Siren 2(ROM)
+Siren 2(.ROM)
 
-Rule of Rose(RTPK) - PS2
+Rule of Rose(.RTPK) - PS2
 
-One Piece Grand Aventure(APF) - PS2
+One Piece Grand Aventure(.APF) - PS2
 
-Dragon Ball Z Tenkaichi 1 US (VOL) - PS2
+Dragon Ball Z Tenkaichi 1 US (.VOL) - PS2
 
-D.Gray-man Sousha no Shikaku(DAT) - PS2
+D.Gray-man Sousha no Shikaku(.DAT) - PS2
 
-Hannah Montana Spotlight World(HOG) - PS2
+Hannah Montana Spotlight World(.HOG) - PS2
 
 Seigi no Mikata(.BIN) - PS2
 
