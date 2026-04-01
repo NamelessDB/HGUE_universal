@@ -49,6 +49,14 @@ Hannah Montana Spotlight World(HOG) - PS2
 
 Seigi no Mikata(.BIN) - PS2
 
+Obscure I(.HVP) - PS2
+
+Nana(.NKP) - PS2
+
+Koihime Musou Doki Otome Darake no Sangokushi(.BIN) - PS2
+
+Ichigo 100% Strawberry Diary(.NFP) - PS2
+
 
 What container extensions can Open on PS3?
 Dragon Ball Budokai HD Collection (.bin compressed with GZIP DATA_CMN.afs works for now) - PS3
